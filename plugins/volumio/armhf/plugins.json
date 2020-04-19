@@ -713,6 +713,24 @@
 						}
 					],
 					"updated": "26-3-2019"
+				},
+				{
+					"prettyName": "spi_control",
+					"icon": "fa-lightbulb-o",
+					"name": "spi_control",
+					"version": "1.0.0",
+					"url": "http://volumio.github.io/volumio-plugins/plugins/volumio/armhf/user_interface/spi_control/spi_control.zip",
+					"license": "ISC",
+					"description": "Provide ability to control volumio via SPI protocol(e.g. from arduino, stm32 etc.)",
+					"details": "",
+					"author": "windel",
+					"screenshots": [
+						{
+							"image": "",
+							"thumb": ""
+						}
+					],
+					"updated": "19-4-2020"
 				}
 			]
 		}
