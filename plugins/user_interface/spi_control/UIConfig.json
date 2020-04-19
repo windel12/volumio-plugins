@@ -1,0 +1,34 @@
+{
+  "page": {
+    "label": "TRANSLATE.PLUGIN_CONFIGURATION"
+  },
+  "sections": [
+	{
+		"content": [
+        {
+          "id": "username",
+          "type":"text",
+          "element": "input",
+          "doc": "This is the username of your Spotify account",
+          "label": "Username",
+          "value": ""
+        },
+        {
+          "id": "password",
+          "type":"password",
+          "element": "input",
+          "doc": "This is the password of your Spotify account",
+          "label": "Password",
+          "value": ""
+        },
+        {
+          "id":"bitrate",
+          "element": "switch",
+          "doc": "High bitrate",
+          "label": "Set for high bitrate",
+          "value": true
+        }
+      ]
+	}
+  ]
+}
