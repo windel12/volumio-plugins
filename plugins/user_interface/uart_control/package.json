@@ -1,0 +1,22 @@
+{
+	"name": "uart_control",
+	"version": "1.0.0",
+	"description": "Provide ability to control volumio via serial protocol(e.g. from arduino, stm32 etc.)",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "windel",
+	"license": "ISC",
+	"volumio_info": {
+		"prettyName": "uart_control",
+		"icon": "fa-lightbulb-o",
+		"plugin_type": "user_interface"
+	},
+	"dependencies": {
+		"fs-extra": "^0.28.0",
+		"kew": "^0.7.0",
+		"raspi-serial": "^6.0.0",
+		"v-conf": "^1.4.0"
+	}
+}
