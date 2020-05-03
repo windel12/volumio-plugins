@@ -5,7 +5,8 @@ var fs=require('fs-extra');
 var config = new (require('v-conf'))();
 var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
-
+var raspi = require('raspi');
+var Serial = require('raspi-serial').Serial;
 
 module.exports = uartControl;
 function uartControl(context) {
@@ -16,12 +17,41 @@ function uartControl(context) {
 	this.logger = this.context.logger;
 	this.configManager = this.context.configManager;
 
+	raspi.init(() => {
+		self.serial = new Serial({
+			baudRate: 9600,
+			dataBits: 8,
+			stopBits: 1,
+			parity: "even"
+		});
+		self.serial.open(() => {
+			self.serial.on('data', (data) => {
+				process.stdout.write(data);
+			});
+			//self.serial.write('Hello from raspi-serial');
+			setInterval(function(serial){
+				delay(184, serial).then(function(){
+					return delay(18, serial).then(function(){
+						return delay(241, serial).then(function(){
+							return delay(4, serial);
+						})
+					})
+				})
+			}, 500, self.serial);
+		});
+	});
 }
 
+function delay(byte, serial) {
+	var defer = libQ.defer();
+	setTimeout(function(serial) {
+		serial.write(Buffer.from([byte]));
+		defer.resolve();
+	}, 3, serial);
+	return defer.promise;
+}
 
-
-uartControl.prototype.onVolumioStart = function()
-{
+uartControl.prototype.onVolumioStart = function() {
 	var self = this;
 	var configFile=this.commandRouter.pluginManager.getConfigurationFile(this.context,'config.json');
 	this.config = new (require('v-conf'))();
@@ -33,7 +63,6 @@ uartControl.prototype.onVolumioStart = function()
 uartControl.prototype.onStart = function() {
     var self = this;
 	var defer=libQ.defer();
-
 
 	// Once the Plugin has successfull started resolve the promise
 	defer.resolve();
@@ -56,9 +85,7 @@ uartControl.prototype.onRestart = function() {
     // Optional, use if you need it
 };
 
-
 // Configuration Methods -----------------------------------------------------------------------------
-
 uartControl.prototype.getUIConfig = function() {
     var defer = libQ.defer();
     var self = this;
@@ -70,8 +97,6 @@ uartControl.prototype.getUIConfig = function() {
         __dirname + '/UIConfig.json')
         .then(function(uiconf)
         {
-
-
             defer.resolve(uiconf);
         })
         .fail(function()
@@ -101,14 +126,9 @@ uartControl.prototype.setConf = function(varName, varValue) {
 	//Perform your installation tasks here
 };
 
-
-
 // Playback Controls ---------------------------------------------------------------------------------------
 // If your plugin is not a music_sevice don't use this part and delete it
-
-
 uartControl.prototype.addToBrowseSources = function () {
-
 	// Use this function to add your music service plugin to music sources
     //var data = {name: 'Spotify', uri: 'spotify',plugin_type:'music_service',plugin_name:'spop'};
     this.commandRouter.volumioAddToBrowseSources(data);
@@ -119,12 +139,8 @@ uartControl.prototype.handleBrowseUri = function (curUri) {
 
     //self.commandRouter.logger.info(curUri);
     var response;
-
-
     return response;
 };
-
-
 
 // Define a method to clear, add, and play an array of tracks
 uartControl.prototype.clearAddPlayTrack = function(track) {
@@ -146,24 +162,18 @@ uartControl.prototype.seek = function (timepos) {
 uartControl.prototype.stop = function() {
 	var self = this;
 	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::stop');
-
-
 };
 
 // Spop pause
 uartControl.prototype.pause = function() {
 	var self = this;
 	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::pause');
-
-
 };
 
 // Get state
 uartControl.prototype.getState = function() {
 	var self = this;
 	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::getState');
-
-
 };
 
 //Parse state
@@ -179,9 +189,11 @@ uartControl.prototype.pushState = function(state) {
 	var self = this;
 	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::pushState');
 
+	if(self.serial._isOpen) {
+		self.serial.write('pushState');
+	}
 	return libQ.resolve();
 };
-
 
 uartControl.prototype.explodeUri = function(uri) {
 	var self = this;
@@ -193,7 +205,6 @@ uartControl.prototype.explodeUri = function(uri) {
 };
 
 uartControl.prototype.getAlbumArt = function (data, path) {
-
 	var artist, album;
 
 	if (data != undefined && data.path != undefined) {
@@ -227,10 +238,6 @@ uartControl.prototype.getAlbumArt = function (data, path) {
 	return url;
 };
 
-
-
-
-
 uartControl.prototype.search = function (query) {
 	var self=this;
 	var defer=libQ.defer();
@@ -241,27 +248,21 @@ uartControl.prototype.search = function (query) {
 };
 
 uartControl.prototype._searchArtists = function (results) {
-
 };
 
 uartControl.prototype._searchAlbums = function (results) {
-
 };
 
 uartControl.prototype._searchPlaylists = function (results) {
-
-
 };
 
 uartControl.prototype._searchTracks = function (results) {
-
 };
 
 uartControl.prototype.goto=function(data){
     var self=this
     var defer=libQ.defer()
 
-// Handle go to artist and go to album function
-
+	// Handle go to artist and go to album function
      return defer.promise;
 };
