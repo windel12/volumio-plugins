@@ -26,10 +26,51 @@ function uartControl(context) {
 		});
 		self.serial.open(() => {
 			self.serial.on('data', (data) => {
-				process.stdout.write(data);
+				if(data[2] == 249) { // Source: Volumio
+					if (data[3] == 1) { // playback
+						switch (data[4]) {
+							case 1:
+								self.commandRouter.volumioStop();
+								break;
+							case 2:
+								self.commandRouter.volumioPause();
+								break;
+							case 3:
+								self.commandRouter.volumioPlay();
+								break;
+							case 4:
+								self.commandRouter.volumioPrevious();
+								break;
+							case 5:
+								self.commandRouter.volumioNext();
+								break;
+							/*case 6:
+								self.commandRouter.volumioVolume();
+								break;*/
+						}
+					}
+					if(data[3] == 2) { // System
+						switch (data[4]) {
+							case 1:
+								break;
+							case 2:
+								var data = Buffer.from('going to reboot', 'utf-8').toJSON().data
+								data = [2, 2].concat(data);
+								self.serial.write(createIBusMessage.apply(null, data));
+								setTimeout(self.commandRouter.reboot, 1000);
+								break;
+							case 3:
+								var data = Buffer.from('going to shutdown', 'utf-8').toJSON().data
+								data = [2, 3].concat(data);
+								self.serial.write(createIBusMessage.apply(null, data));
+								setTimeout(self.commandRouter.shutdown, 1000);
+								break;
+						}
+					}
+				}
 			});
 			//self.serial.write('Hello from raspi-serial');
-			setInterval(function(serial){
+/*			setInterval(function(serial){
 				delay(184, serial).then(function(){
 					return delay(18, serial).then(function(){
 						return delay(241, serial).then(function(){
@@ -37,19 +78,19 @@ function uartControl(context) {
 						})
 					})
 				})
-			}, 500, self.serial);
+			}, 500, self.serial);*/
 		});
 	});
 }
 
-function delay(byte, serial) {
+/*function delay(byte, serial) {
 	var defer = libQ.defer();
 	setTimeout(function(serial) {
 		serial.write(Buffer.from([byte]));
 		defer.resolve();
 	}, 3, serial);
 	return defer.promise;
-}
+}*/
 
 uartControl.prototype.onVolumioStart = function() {
 	var self = this;
@@ -190,10 +231,44 @@ uartControl.prototype.pushState = function(state) {
 	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::pushState');
 
 	if(self.serial._isOpen) {
-		self.serial.write('pushState');
+		switch (state.status) {
+			case 'stop':
+				data = [1, 1];
+				self.serial.write(createIBusMessage.apply(null, data));
+				break;
+			case 'pause':
+				data = [1, 2];
+				self.serial.write(createIBusMessage.apply(null, data));
+				break;
+			case 'play':
+				var data = Buffer.from(state.title, 'utf-8').toJSON().data
+				data = [1, 3].concat(data);
+				self.serial.write(createIBusMessage.apply(null, data));
+				break;
+		}
 	}
 	return libQ.resolve();
 };
+
+function createIBusMessage() {
+	var args = arguments;
+	var source = 249; // 0xF9 - Volumio
+	var packetLength = args.length + 2;
+	var destination = 250; // 0xFA - imBMW(or your own any ID)
+	var check = 0;
+	check ^= source;
+	check ^= packetLength;
+	check ^= destination;
+	for(var i = 0; i < args.length; i++){
+		check ^= args[i];
+	}
+	var dataDump = [source, packetLength, destination];
+	for(var i = 0; i < args.length; i++){
+		dataDump.push(args[i]);
+	}
+	dataDump.push(check);
+	return Buffer.from(dataDump);
+}
 
 uartControl.prototype.explodeUri = function(uri) {
 	var self = this;
