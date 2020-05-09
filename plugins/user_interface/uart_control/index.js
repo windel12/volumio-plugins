@@ -25,6 +25,10 @@ function uartControl(context) {
 			parity: "even"
 		});
 		self.serial.open(() => {
+			var data = Buffer.from('Volumio READY!', 'utf-8').toJSON().data
+			data = [0, 0].concat(data);
+			self.serial.write(createIBusMessage.apply(null, data));
+
 			self.serial.on('data', (data) => {
 				if(data[2] == 249) { // Source: Volumio
 					if (data[3] == 1) { // playback
@@ -57,13 +61,13 @@ function uartControl(context) {
 								var data = Buffer.from('going to reboot', 'utf-8').toJSON().data
 								data = [2, 2].concat(data);
 								self.serial.write(createIBusMessage.apply(null, data));
-								setTimeout(self.commandRouter.reboot, 1000);
+								self.commandRouter.reboot();
 								break;
 							case 3:
 								var data = Buffer.from('going to shutdown', 'utf-8').toJSON().data
 								data = [2, 3].concat(data);
 								self.serial.write(createIBusMessage.apply(null, data));
-								setTimeout(self.commandRouter.shutdown, 1000);
+								self.commandRouter.shutdown();
 								break;
 						}
 					}
