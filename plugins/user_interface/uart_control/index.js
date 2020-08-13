@@ -17,7 +17,11 @@ function uartControl(context) {
 	this.logger = this.context.logger;
 	this.configManager = this.context.configManager;
 
+	self.logger.info("uart_control created!");
+
 	raspi.init(() => {
+		self.logger.info("raspi-serial inited!");
+
 		self.serial = new Serial({
 			baudRate: 9600,
 			dataBits: 8,
@@ -25,11 +29,15 @@ function uartControl(context) {
 			parity: "even"
 		});
 		self.serial.open(() => {
+			self.logger.info("/dev/serial0 opened!");
+
 			var data = Buffer.from('Volumio READY!', 'utf-8').toJSON().data
 			data = [0, 0].concat(data);
 			self.serial.write(createIBusMessage.apply(null, data));
 
 			self.serial.on('data', (data) => {
+				self.logger.info("/dev/serial0 opened!");
+
 				if(data[2] == 249) { // Source: Volumio
 					if (data[3] == 1) { // playback
 						switch (data[4]) {
@@ -48,9 +56,10 @@ function uartControl(context) {
 							case 5:
 								self.commandRouter.volumioNext();
 								break;
-							/*case 6:
-								self.commandRouter.volumioVolume();
-								break;*/
+							case 6:
+								var position = (data[5] << 8) + data[6];
+								self.commandRouter.volumioSeek(position);
+								break;
 						}
 					}
 					if(data[3] == 2) { // System
@@ -73,28 +82,37 @@ function uartControl(context) {
 					}
 				}
 			});
-			//self.serial.write('Hello from raspi-serial');
-/*			setInterval(function(serial){
-				delay(184, serial).then(function(){
-					return delay(18, serial).then(function(){
-						return delay(241, serial).then(function(){
-							return delay(4, serial);
-						})
-					})
-				})
-			}, 500, self.serial);*/
 		});
 	});
 }
 
-/*function delay(byte, serial) {
-	var defer = libQ.defer();
-	setTimeout(function(serial) {
-		serial.write(Buffer.from([byte]));
-		defer.resolve();
-	}, 3, serial);
-	return defer.promise;
-}*/
+// Announce updated State
+uartControl.prototype.pushState = function(state) {
+	var self = this;
+	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::pushState');
+
+	if(self.serial._isOpen) {
+		switch (state.status) {
+			case 'stop':
+				data = [1, 1];
+				self.serial.write(createIBusMessage.apply(null, data));
+				break;
+			case 'pause':
+				data = [1, 2];
+				self.serial.write(createIBusMessage.apply(null, data));
+				break;
+			case 'play':
+				var data = Buffer.from(state.title, 'utf-8').toJSON().data;
+				data = [1, 3].concat(data);
+				var duration_h = state.duration >> 8;
+				var duration_l = state.duration & 0x00FF;
+				data = data.concat([duration_h, duration_l]);
+				self.serial.write(createIBusMessage.apply(null, data));
+				break;
+		}
+	}
+	return libQ.resolve();
+};
 
 uartControl.prototype.onVolumioStart = function() {
 	var self = this;
@@ -227,31 +245,6 @@ uartControl.prototype.parseState = function(sState) {
 	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::parseState');
 
 	//Use this method to parse the state and eventually send it with the following function
-};
-
-// Announce updated State
-uartControl.prototype.pushState = function(state) {
-	var self = this;
-	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::pushState');
-
-	if(self.serial._isOpen) {
-		switch (state.status) {
-			case 'stop':
-				data = [1, 1];
-				self.serial.write(createIBusMessage.apply(null, data));
-				break;
-			case 'pause':
-				data = [1, 2];
-				self.serial.write(createIBusMessage.apply(null, data));
-				break;
-			case 'play':
-				var data = Buffer.from(state.title, 'utf-8').toJSON().data
-				data = [1, 3].concat(data);
-				self.serial.write(createIBusMessage.apply(null, data));
-				break;
-		}
-	}
-	return libQ.resolve();
 };
 
 function createIBusMessage() {
