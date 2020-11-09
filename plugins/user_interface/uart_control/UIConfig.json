@@ -3,5 +3,41 @@
     "label": "TRANSLATE.PLUGIN_CONFIGURATION"
   },
   "sections": [
+    {
+      "id": "Test",
+      "element": "section",
+      "label": "Test",
+      "icon": "fa-plug",
+      "onSave": {
+        "type": "plugin",
+        "endpoint": "user_interface/uart_control",
+        "method": "test"
+      },
+      "saveButton": {
+        "label": "Execute",
+        "data": [
+          "data3",
+          "data4"
+        ]
+      },
+      "content": [
+        {
+          "id": "data3",
+          "type":"number",
+          "element": "input",
+          "doc": "First data byte for test",
+          "label": "Data3",
+          "value": ""
+        },
+        {
+          "id": "data4",
+          "type":"number",
+          "element": "input",
+          "doc": "Second data byte for test",
+          "label": "Data4",
+          "value": ""
+        }
+      ]
+    }
   ]
 }

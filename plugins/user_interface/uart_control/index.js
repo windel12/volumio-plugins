@@ -8,6 +8,26 @@ var execSync = require('child_process').execSync;
 var raspi = require('raspi');
 var Serial = require('raspi-serial').Serial;
 
+function createIBusMessage() {
+	var args = arguments;
+	var source = 249; // 0xF9 - Volumio
+	var packetLength = args.length + 2;
+	var destination = 250; // 0xFA - imBMW(or your own any ID)
+	var check = 0;
+	check ^= source;
+	check ^= packetLength;
+	check ^= destination;
+	for(var i = 0; i < args.length; i++){
+		check ^= args[i];
+	}
+	var dataDump = [source, packetLength, destination];
+	for(var i = 0; i < args.length; i++){
+		dataDump.push(args[i]);
+	}
+	dataDump.push(check);
+	return Buffer.from(dataDump);
+}
+
 module.exports = uartControl;
 function uartControl(context) {
 	var self = this;
@@ -36,54 +56,67 @@ function uartControl(context) {
 			self.serial.write(createIBusMessage.apply(null, data));
 
 			self.serial.on('data', (data) => {
-				self.logger.info("/dev/serial0 opened!");
+				self.logger.info("/dev/serial0 data received!");
 
-				if(data[2] == 249) { // Source: Volumio
-					if (data[3] == 1) { // playback
-						switch (data[4]) {
-							case 1:
-								self.commandRouter.volumioStop();
-								break;
-							case 2:
-								self.commandRouter.volumioPause();
-								break;
-							case 3:
-								self.commandRouter.volumioPlay();
-								break;
-							case 4:
-								self.commandRouter.volumioPrevious();
-								break;
-							case 5:
-								self.commandRouter.volumioNext();
-								break;
-							case 6:
-								var position = (data[5] << 8) + data[6];
-								self.commandRouter.volumioSeek(position);
-								break;
-						}
-					}
-					if(data[3] == 2) { // System
-						switch (data[4]) {
-							case 1:
-								break;
-							case 2:
-								var data = Buffer.from('going to reboot', 'utf-8').toJSON().data
-								data = [2, 2].concat(data);
-								self.serial.write(createIBusMessage.apply(null, data));
-								self.commandRouter.reboot();
-								break;
-							case 3:
-								var data = Buffer.from('going to shutdown', 'utf-8').toJSON().data
-								data = [2, 3].concat(data);
-								self.serial.write(createIBusMessage.apply(null, data));
-								self.commandRouter.shutdown();
-								break;
-						}
-					}
-				}
+				self.handleData(data);
 			});
 		});
 	});
+}
+
+uartControl.prototype.handleData = function(data) {
+	var self = this;
+
+	if (data[2] == 249) { // Source: Volumio
+		if (data[3] == 1) { // playback
+			switch (data[4]) {
+				case 1:
+					self.commandRouter.volumioStop();
+					break;
+				case 2:
+					self.commandRouter.volumioPause();
+					break;
+				case 3:
+					self.commandRouter.volumioPlay();
+					break;
+				case 4:
+					self.commandRouter.volumioPrevious();
+					break;
+				case 5:
+					self.commandRouter.volumioNext();
+					break;
+				case 6:
+					var position = (data[5] << 8) + data[6];
+					self.commandRouter.volumioSeek(position);
+					break;
+			}
+		}
+		if(data[3] == 2) { // System
+			switch (data[4]) {
+				case 1:
+					break;
+				case 2:
+					var data = Buffer.from('going to reboot', 'utf-8').toJSON().data
+					data = [2, 2].concat(data);
+					self.serial.write(createIBusMessage.apply(null, data));
+					self.commandRouter.reboot();
+					break;
+				case 3:
+					var data = Buffer.from('going to shutdown', 'utf-8').toJSON().data
+					data = [2, 3].concat(data);
+					self.serial.write(createIBusMessage.apply(null, data));
+					self.commandRouter.shutdown();
+					break;
+			}
+		}
+		if (data[3] == 3) { // ClearQueue
+			self.commandRouter.volumioClearQueue();
+		}
+		if (data[3] == 4) { // AddPlaylistToQueue
+			var number = data[4];
+			self.commandRouter.playListManager.enqueue(number.toString());
+		}
+	}
 }
 
 // Announce updated State
@@ -112,6 +145,21 @@ uartControl.prototype.pushState = function(state) {
 		}
 	}
 	return libQ.resolve();
+};
+
+uartControl.prototype.test = function(obj) {
+	var self = this;
+	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::test');
+
+	var packet = [
+		250, 	// Source: imBMW
+		0,  	// Fake lenght
+		249, 	// Destination: Volumio,
+		obj.data3,
+		obj.data4,
+		0		// Fake CRC
+	]
+	self.handleData(packet);
 };
 
 uartControl.prototype.onVolumioStart = function() {
@@ -246,26 +294,6 @@ uartControl.prototype.parseState = function(sState) {
 
 	//Use this method to parse the state and eventually send it with the following function
 };
-
-function createIBusMessage() {
-	var args = arguments;
-	var source = 249; // 0xF9 - Volumio
-	var packetLength = args.length + 2;
-	var destination = 250; // 0xFA - imBMW(or your own any ID)
-	var check = 0;
-	check ^= source;
-	check ^= packetLength;
-	check ^= destination;
-	for(var i = 0; i < args.length; i++){
-		check ^= args[i];
-	}
-	var dataDump = [source, packetLength, destination];
-	for(var i = 0; i < args.length; i++){
-		dataDump.push(args[i]);
-	}
-	dataDump.push(check);
-	return Buffer.from(dataDump);
-}
 
 uartControl.prototype.explodeUri = function(uri) {
 	var self = this;
