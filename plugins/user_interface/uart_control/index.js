@@ -5,27 +5,12 @@ var fs=require('fs-extra');
 var config = new (require('v-conf'))();
 var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
-var raspi = require('raspi');
-var Serial = require('raspi-serial').Serial;
+try {
+	var raspi = require('raspi');
+	var Serial = require('raspi-serial').Serial;
+}
+catch {
 
-function createIBusMessage() {
-	var args = arguments;
-	var source = 249; // 0xF9 - Volumio
-	var packetLength = args.length + 2;
-	var destination = 250; // 0xFA - imBMW(or your own any ID)
-	var check = 0;
-	check ^= source;
-	check ^= packetLength;
-	check ^= destination;
-	for(var i = 0; i < args.length; i++){
-		check ^= args[i];
-	}
-	var dataDump = [source, packetLength, destination];
-	for(var i = 0; i < args.length; i++){
-		dataDump.push(args[i]);
-	}
-	dataDump.push(check);
-	return Buffer.from(dataDump);
 }
 
 module.exports = uartControl;
@@ -38,6 +23,10 @@ function uartControl(context) {
 	this.configManager = this.context.configManager;
 
 	self.logger.info("uart_control created!");
+
+	if (!raspi) {
+		return;
+	}
 
 	raspi.init(() => {
 		self.logger.info("raspi-serial inited!");
@@ -62,6 +51,40 @@ function uartControl(context) {
 			});
 		});
 	});
+}
+
+function createIBusMessage() {
+	var args = arguments;
+	var source = 249; // 0xF9 - Volumio
+	var packetLength = args.length + 2;
+	var destination = 250; // 0xFA - imBMW(or your own any ID)
+	var check = 0;
+	check ^= source;
+	check ^= packetLength;
+	check ^= destination;
+	for(var i = 0; i < args.length; i++){
+		check ^= args[i];
+	}
+	var dataDump = [source, packetLength, destination];
+	for(var i = 0; i < args.length; i++){
+		dataDump.push(args[i]);
+	}
+	dataDump.push(check);
+	return Buffer.from(dataDump);
+}
+
+uartControl.prototype.volumioCommands = {
+	common: 0,
+	playback: 1,
+	system: 2,
+	clearQueue: 3,
+	addPlaylistToQueue: 4
+}
+
+uartControl.prototype.commonCommands = {
+	init: 0,
+	displayMessage: 1,
+	displayMessageWithGong: 2
 }
 
 uartControl.prototype.handleData = function(data) {
@@ -111,10 +134,16 @@ uartControl.prototype.handleData = function(data) {
 		}
 		if (data[3] == 3) { // ClearQueue
 			self.commandRouter.volumioClearQueue();
+			var data = Buffer.from('Queue cleared', 'utf-8').toJSON().data
+			data = [self.volumioCommands.common, self.commonCommands.displayMessageWithGong].concat(data);
+			self.serial.write(createIBusMessage.apply(null, data));
 		}
 		if (data[3] == 4) { // AddPlaylistToQueue
 			var number = data[4];
 			self.commandRouter.playListManager.enqueue(number.toString());
+			var data = Buffer.from('Added #' + number, 'utf-8').toJSON().data
+			data = [self.volumioCommands.common, self.commonCommands.displayMessageWithGong].concat(data);
+			self.serial.write(createIBusMessage.apply(null, data));
 		}
 	}
 }
@@ -123,6 +152,10 @@ uartControl.prototype.handleData = function(data) {
 uartControl.prototype.pushState = function(state) {
 	var self = this;
 	self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'uartControl::pushState');
+
+	if (!self.serial) {
+		return;
+	}
 
 	if(self.serial._isOpen) {
 		switch (state.status) {
