@@ -9,7 +9,7 @@ try {
 	var raspi = require('raspi');
 	var Serial = require('raspi-serial').Serial;
 }
-catch {
+catch (e) {
 
 }
 
